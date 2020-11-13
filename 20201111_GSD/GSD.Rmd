@@ -1,0 +1,189 @@
+---
+title: "Why do we use group-sequential designs?"
+author: "Kaspar Rufibach"
+date: "Last change: `r format(Sys.time(), '%dth %B %Y')`"
+output: 
+  rmarkdown::html_document:
+    highlight: pygments
+    number_sections: no
+    self_contained: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+# Purpose of this document
+
+This R markdown file accompanies the [twitter thread](https://twitter.com/numbersman77/status/1326548973411135490?s=20) and provides the code to reproduce all computations. It heavily borrows from code within the [rpact project](http://www.rpact.org). Find the code on [github](https://github.com/numbersman77/twitter.git).
+
+A much more comprehensive description is available in this [rpact vignette](https://vignettes.rpact.org/html/rpact_survival_examples.html#8_Sample_size_calculation_for_trials_with_interim_analyses).
+
+# Setup
+
+```{r, include=TRUE, echo=TRUE}
+# --------------------------------------------------------------
+# packages
+# --------------------------------------------------------------
+packs <- c("rpact", "reporttools")    
+for (i in 1:length(packs)){library(packs[i], character.only = TRUE)}
+```
+
+# Code
+
+```{r, include=TRUE, echo=TRUE}
+# --------------------------------------------------------------
+# trial basics
+# --------------------------------------------------------------
+alpha <- 0.05
+beta <- 0.2
+
+# effect size and medians
+m1 <- 60
+hr <- 0.75
+m2 <- m1 / hr
+
+# required events for single-stage design, i.e. without interim
+nevent <- getSampleSizeSurvival(hazardRatio = hr, sided = 2, alpha = alpha, beta = beta)
+nevent <- ceiling(nevent$maxNumberOfEvents)
+```
+
+So for a single stage design we need `r nevent` events **in any case**, i.e. even if the effect is much smaller or larger than what we assume for powering (hazard ratio = `r hr`).
+
+```{r, include=TRUE, echo=TRUE}
+# information fractions after which to perform interim looks
+info <- c(0.3, 0.66, 1)
+```
+
+Now generate a design where you add a futility interim after `r info[1] * 100`% of events and an interim for efficacy after `r info[2] * 100`% of events. At the futility interim, the trial will be stopped if the hazard ratio is below 1 and for effiacy we use an O'Brian-Fleming type $\alpha$-spending function (or rather the Lan-DeMets approximation to it).
+
+```{r, include=TRUE, echo=TRUE}
+
+# OBF design without initial interim at 30% (to get cumulative alpha-spending function for these visits)
+design1 <- getDesignGroupSequential(sided = 1, alpha = alpha / 2, beta = beta, 
+                                   informationRates = info[-1],
+                                   typeOfDesign = "asOF")
+
+# now spend very little alpha at first interim --> interim stopping not an option
+# -6 codifies "no futility" at the 2nd interim
+design <- getDesignGroupSequential(futilityBounds = c(0, -6), bindingFutility = FALSE,
+                                    informationRates = info, typeOfDesign = "asUser",
+                                    userAlphaSpending = c(0.0000001, design1$alphaSpent))
+
+samplesize <- getSampleSizeSurvival(design = design, lambda2 = log(2) / m1, hazardRatio = hr,
+                                    dropoutRate1 = 0.025, dropoutRate2 = 0.025, dropoutTime = 12,
+                                    accrualTime = 0, accrualIntensity = 42, maxNumberOfSubjects = 1200)
+samplesize
+```
+
+So adding these interims (and not accounting for the power loss induced through adding the futility!) increases the number of events from `r nevent` to `r ceiling(samplesize$maxNumberOfEvents)` - only a slight increase.
+
+Note that at the second interim stopping for futility is not foreseen anymore (the `-6` for `futilityBounds` enforces that).
+
+```{r, include=TRUE, echo=TRUE}
+# information fractions after which to perform interim looks
+nevents_i1 <- ceiling(info * samplesize$maxNumberOfEvents)
+nevents_i1
+```
+
+Now the key is that when using a group-sequential design, or say if we run 100 of them, some of them will actually stop at the first or second interim. We can compute the probabilities for that happening as follows:
+
+```{r, include=TRUE, echo=TRUE}
+# stopping probabilities at futility and efficacy interim under H0 and H1
+designChar <- getDesignCharacteristics(design)
+stopProbsH0 <- getPowerAndAverageSampleNumber(design, theta = 0, nMax = designChar$shift)
+stopProbsH1 <- getPowerAndAverageSampleNumber(design, theta = 1, nMax = designChar$shift)
+
+stopFutIA_H0 <- stopProbsH0$earlyStop["stage = 1", 1]
+stopEffIA_H0 <- stopProbsH0$earlyStop["stage = 2", 1]
+
+stopFutIA_H1 <- stopProbsH1$earlyStop["stage = 1", 1]
+stopEffIA_H1 <- stopProbsH1$earlyStop["stage = 2", 1]
+
+# probability to stop at the futility interim, under H0 and H1
+c(stopFutIA_H0, stopFutIA_H1)
+
+# probability to stop at the efficacy interim, under H0 and H1
+c(stopEffIA_H0, stopEffIA_H1)
+
+# Expected number of events under H0 and H1 
+expH0 <- samplesize$expectedEventsH0
+expH1 <- samplesize$expectedEventsH1
+```
+
+Now the point is that if we stop at an interim we will need less events, because we would stop the trial then. The **expected number of events* can be computed as follows:
+
+* Under $H_0$: `r disp(stopFutIA_H0, 3)` $\cdot$ `r nevents_i1[1]` + `r disp(stopEffIA_H0, 3)` $\cdot$ `r nevents_i1[2]` + `r disp((1 - stopFutIA_H0 - stopEffIA_H0), 3)` $\cdot$ `r nevents_i1[3]` = `r disp(expH0, 0)`.
+* Under $H_1$: `r disp(stopFutIA_H1, 3)` $\cdot$ `r nevents_i1[1]` + `r disp(stopEffIA_H1, 3)` $\cdot$ `r nevents_i1[2]` + `r disp(1 - stopFutIA_H1-stopEffIA_H1, 3)` $\cdot$ `r nevents_i1[3]` = `r disp(expH1, 0)`.
+
+So if we use the specified group-sequential design and in fact, our intervention does not work at all ($H_0$ is true), then on average we only need `r disp(expH0, 0)` instead of the `r nevent` events in a single-stage design.
+
+Under $H_1$, i.e. if the drug works as assumed for powering the trial, we then need on average only `r disp(expH1, 0)` events to show that, i.e. reject the null hypothesis of the hazard ratio being equal to 0. This is the point of group-sequential designs: the maximal number of events in a given trial is slightly increased, but the average number of events over a portfolio of trials is reduced. 
+
+Now, what effect size do we need to observe at the efficacy interim to stop the trial, based on an O'Brien-Fleming $\alpha$-spending function? We can easily extract that number from the above output as follows:
+
+```{r, include=TRUE, echo=TRUE}
+# critical values on effect, i.e. hazard ratio, scale
+crit1 <- t(disp(samplesize$criticalValuesEffectScale, 3))
+crit1
+
+# 2-sided significance levels on p-value scale
+crit2 <- disp(samplesize$criticalValuesPValueScale * 2, 3)
+crit2
+```
+
+So this means that after `r info[2] * 100`% of events, in order to get a $p$-value below the pre-specified boundary of `r crit2[2]` the hazard ratio must be below `r crit1[2]`. The latter is what sometimes is called **minimal detectable difference**, MDD. Two observations can be made from that:
+
+* Often, people believe in order to stop a trial early the effect seen at the interim must be **much larger** than what we assumed for powering. Comparing `r hr` to `r crit1[2]` it is clear that this is not the case. That the MDD at interim and the effect we power at are approximately the same is typically the case for an O'Brien-Fleming boundary and an interim after about 2/3 of information.
+* Another common belief is that in order to be significant at the interim we need to observe a hazard ratio $\le `r hr`$. Again, this is not true: the MDD at the final analysis actually is `r crit1[3]`, i.e. in order to get a $p$-value of `r crit2[3]` or lower this is the hazard ratio we need to beat.
+
+# Inference after early stopping
+
+See this [rpact vignette](https://vignettes.rpact.org/html/rpact_analysis_examples.html) for further details.
+
+## Conventional analyses at the first and second interim analysis
+
+Assume the following results from standard inference at the **futility interim analysis performed after `r nevents_i1[1]` events** have been observed:
+
+- Stratified HR 0.69 (95% CI 0.47 to 1.01). $\Rightarrow$ this was $\le 1$, so **trial continues.**
+- log(HR) = log(0.69) with standard error 0.20.
+- Corresponding Z-score: log(0.69)/0.20 = -1.86.
+
+Results from standard inference at the **efficacy interim analysis after `r nevents_i1[2]` events**:
+
+- Stratified HR 0.66 (95% CI 0.51 to 0.85). 
+- log(HR) = log(0.66) with standard error 0.13.
+- Corresponding Z-score: log(0.66)/0.13 = -3.225.
+- Two-sided p-value is 0.0012 which was smaller than the critical value from the O'Brien-Fleming boundary of `r crit2[2]`.  $\Rightarrow$ **Trial stopped early for efficacy**.
+
+## Analysis accounting for the group-sequential design
+
+The **results after the first and second interim** are specified using the function `getDataset`:
+```{r, include=TRUE, echo=TRUE}
+# overallLogRanks: One-sided logrank statistic or Z-score (= log(HR) / SE) from Cox regression
+results <- getDataset(
+    overallEvents = nevents_i1[1:2],
+    overallLogRanks = c(-1.86, -3.225),
+    overallAllocationRatio = c(1, 1))
+```
+
+Finally, this is used for creating the **adjusted inference** using the function `getAnalysisResults` (`directionUpper = FALSE` is specified because the power is directed towards negative values of the logrank statistics): 
+```{r, include=TRUE, echo=TRUE}
+adj_result <- getAnalysisResults(design = design, 
+    dataInput = results, stage = 2, directionUpper = FALSE)
+adj_result
+```
+
+The output is explained as follows:
+
+- `Critical values` are group-sequential efficacy boundary values on the $Z$-scale, `stage levels` are the corresponding one-sided local significance levels.
+- `Effect sizes`, `Test statistics`, and `p-values` refer to hazard ratio estimates, $Z$-scores, and $p$-values obtained from the first interim analysis and results which would have been obtained after the second interim analysis if not all data up to the second interim analysis but only new data since the first interim had been included (i.e., per-stage results). 
+- `Overall test statistics` are the given (overall, not per-stage) $Z$-scores from each interim and `Overall p-value` the corresponding one-sided $p$-values.
+- `RCIs` are repeated confidence intervals which provide valid (but conservative) inference at any stage of an ongoing or stopped group-sequential trial. `Repeated p-values` are the corresponding $p$-values.
+- `Final p-value` is the **final one-sided adjusted $p$-value** based on the stagewise ordering of the sample space.
+-  `Median unbiased estimate` and `Final CIs` are the corresponding **adjusted treatment effect estimate** and the **confidence interval** for the hazard ratio at the interim analysis where the trial was stopped.
+
+Note that for this example, the **adjusted final hazard ratio of  `r formatC(na.omit(adj_result$medianUnbiasedEstimates),digits=2,format="f")`
+and the adjusted confidence interval of 
+(`r formatC(na.omit(adj_result$finalConfidenceIntervalLowerBounds),digits=2,format="f")`,
+`r formatC(na.omit(adj_result$finalConfidenceIntervalUpperBounds),digits=2,format="f")`) match the  results from the conventional analysis almost exactly for the first two decimals.** 
+
