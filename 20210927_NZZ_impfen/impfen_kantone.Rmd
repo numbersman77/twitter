@@ -1,0 +1,168 @@
+---
+title: "Kommentar zum NZZ Artikel _So gross ist der Zusammenhang zwischen Impfquote und Fallzahlen_"
+author: "Kaspar Rufibach, Meiringen"
+date: "Letzte Aktualisierung: 28ter September"
+output: 
+  rmarkdown::html_document:
+    highlight: pygments
+    number_sections: no
+    self_contained: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+# Vorneweg
+
+Ich möchte vorneweg schicken, dass es mir nicht darum geht, den Zusammenhang "Impfquote - Inzidenz" in Frage zu stellen. Ich bin überzeugter Impfbefürworter und habe am 12. Juni 2021 meine zweite Covid-Impfung erhalten.
+
+Aber mich überzeugt die statistische Analyse im unten zitierten Artikel nicht vollständig und ich lege hier meine Sichtweise dar.
+
+# Zusammenfassung
+
+Am 23. September 2021 erschien [dieser Artikel](https://www.nzz.ch/schweiz/corona-in-der-schweiz-je-mehr-impfungen-desto-weniger-faelle-ld.1646731) in der NZZ und wurde auf [Twitter diskutiert](https://twitter.com/nthelitz/status/1441061065635340290?s=20). Auch der [Tagesanzeiger](https://www.tagesanzeiger.ch) hat dieselben Daten in diesem [Artikel](https://www.tagesanzeiger.ch/dort-wo-viele-geimpft-sind-gibt-es-weniger-ansteckungen-115502688268) analysiert. Der 2. Artikel liegt hinter einer Bezahlschranke, ich habe ihn deswegen nicht lesen können.
+
+In dieser kurzen Analyse gehe ich auf einige Punkte im NZZ Artikel ein, für die die Daten meiner Meinung nach anders interpretiert werden könnten (sollten?).
+
+# Fragestellungen
+
+Wenn ich den NZZ Artikel korrekt verstehe, sollen die folgenden Fragen beantwortet werden:
+
+* Besteht ein Zusammenhang zwischen dem Anteil der vollständig geimpften Personen und den Anzahl Corona-Fällen?
+* Ist dieser Zusammenhang linear?
+* Wie stark ist dieser Zusammenhang?
+
+# Daten und Programmcode
+
+Als Daten zur Verfügung stehen
+
+* Anteil der vollständig geimpften Personen vor zwei Wochen, in Prozent,
+* Fälle pro 100 000 Einwohner in den letzten zwei Wochen (Inzidenz).
+
+Lobenswerterweise haben die Autoren des obigen Artikels ihren Programmcode auf [hier](https://github.com/nzzdev/st-methods/tree/master/2135%20Neuinfektionen%20und%20Impfungen) zur Verfügung gestellt, sodass die Daten einfach zu beschaffen sind.
+
+Analog ist der Programmcode für diesen Bericht [hier](https://github.com/numbersman77/twitter) verfügbar.
+
+# Analyse
+
+Als erstes reproduziere ich die erste Grafik im NZZ Artikel. 
+
+```{r, include=TRUE, echo=FALSE, results = FALSE, message = FALSE}
+source("../20210927_NZZ_impfen/inputdata.r", echo = FALSE)
+library(reporttools)
+
+# define groups
+cant <- select(combined, geounit)[[1]]
+g1 <- c("AI", "GL", "OW")
+g2 <- c("AR", "SG", "UR", "SZ", "TG")
+g3 <- cant[(cant %in% c(g1, g2)) == FALSE]
+
+# some models used later
+m1 <- lm(per100k ~ second_pct, data = combined)
+m2 <- lm(per100k ~ second_pct, weights = pop, data = combined)
+m3 <- lm(per100k ~ second_pct, weights = pop, data = filter(combined, geounit %in% g3)) 
+```
+
+
+```{r, echo = FALSE, results = 'asis', message = FALSE, fig.cap = "", fig.align = "center", fig.width = 7, fig.height = 7}
+ggplot(data = combined, mapping = aes(x = second_pct, y = per100k, label=geounit)) +
+  geom_text_repel() +
+  ylab("Fälle pro 100 000 Einwohner in den letzten zwei Wochen (Inzidenz)") + 
+  xlab("Anteil der vollständig geimpften Personen vor zwei Wochen, in Prozent") +
+  geom_point(aes(size = pop, alpha = 0.5)) +
+  scale_size(range = c(1, 15)) +
+  theme_minimal()
+```
+
+Die Kreise sind proportional zur Bevölkerungsgrösse. Schauen wir uns diese Grafik genauer an, dann fallen die folgenden Dinge auf:
+
+* Über alle Kantone scheint der Zusammenhang _negativ_ zu sein, d.h. je mehr vollständig Geimpfte desto weniger Fälle.
+* Allerdings sehen wir auch drei Gruppen von Kantonen (Gruppe 1: `r paste(g1, collapse = " / ")` vs. Gruppe 2: `r paste(g2, collapse = " / ")` vs. Gruppe 3: Rest, d.h. `r paste(g3, collapse = " / ")`) sowie LU, dass ein wenig dazwischensteht und am ehesten dem Rest zugeschlagen werden kann. 
+* Innerhalb dieser Gruppen scheint obiger Zusammenhang viel weniger klar. Man ist sogar geneigt einen leicht _positiven_ Zusammenhang zu "sehen".
+* Zudem besteht Gruppe 1 ausschliesslich aus bez. Bevölkerungszahl kleinen Kantonen.
+
+Der im NZZ Artikel postulierte relevant negative Zusammenhang kommt also eher daher, dass wir *drei Gruppen von Kantonen* haben die eine ähnliche hohe Impfquote aber (pro Gruppe) wesentlich verschiedene Inzidenzen haben und nicht unbedingt direkt vom Zusammenhang Impfquote - Inzidenz.
+
+Im Artikel wir jetzt ohne weitere Diskussion postuliert, dass der negative Zusammenhang _linear_ ist und ein entsprechendes linears Modell wird berechnet und die Koeffizienten werden entsprechend interpretiert ("Statistisch gesehen können knapp 70 Prozent der Unterschiede bei der Inzidenz durch die Impfquote erklärt werden. Ein zusätzliches Prozent vollständig Geimpfter reduziert im linearen statistischen Modell die Inzidenz um rund 35 Fälle.").
+
+Dabei muss klar gemacht werden, dass dieses lineare Modell stark durch Gruppe 1 "getrieben" ist, da diese drei Kantone die gerade "steil machen", umsomehr als im Artikel die Grösse der Kantone bei der Berechnung des Modells nicht berücksichtigt wird, d.h. der Kanton ZH wird genau gleich gewichtet wie der Kanton AI. Das im Artikel nicht gewichtet ist umso erstaunlicher, als die Bevölkerungszahl ja explizit (im Gegensatz zum analogen Artikel im Tagesanzeiger) in der Punktgrösse abgebildet wird.
+
+```{r, echo = FALSE, results = 'asis', message = FALSE, fig.cap = "", fig.align = "center", fig.width = 7, fig.height = 7}
+ggplot(data = combined, mapping = aes(x = second_pct, y = per100k, label=geounit)) +
+  geom_text_repel() +
+  ylab("Fälle pro 100 000 Einwohner in den letzten zwei Wochen (Inzidenz)") + 
+  xlab("Anteil der vollständig geimpften Personen vor zwei Wochen, in Prozent") +
+  geom_point(aes(size = pop, alpha = 0.5)) +
+  scale_size(range = c(1, 15)) +
+  theme_minimal() +
+  geom_smooth(method=lm, se = F, linetype = "dashed", color = "darkblue")
+```
+
+Berechnen wir jedoch eine mit der Bevölkerungsgrösse _gewichtete_ Regression fällt die (absolute) Steiung der Geraden von `r disp(coef(m1)[2], 1)` auf `r disp(coef(m2)[2], 1)` und der Korrelationskoeffizient von `r disp(summary(m1)$r.squared, 2)` auf `r disp(summary(m2)$r.squared, 2)`, der Zusammenhang ist also wesentlicher weniger stark. Es gilt auch zu beachten, dass der Korrelationskoeffizient die Stärke des _linearen_ Zusammenhangs quantifiziert - ist der Zusammenhang aber nicht linear, dann ist der Korrelationskoeffizient (jedenfalls der hier verwendete) nicht vernünftig interpretierbar.
+
+"Statistische Signifikanz" erachte im Zusammenhang mit Korrelationen als wenig informativ, sie sagt lediglich aus, ob die Steigung der angepassten Geraden statistisch verschieden ist von 0.
+
+```{r, echo = FALSE, results = 'asis', message = FALSE, fig.cap = "", fig.align = "center", fig.width = 7, fig.height = 7}
+ggplot(data = combined, mapping = aes(x = second_pct, y = per100k, label=geounit)) +
+  geom_text_repel() +
+  ylab("Fälle pro 100 000 Einwohner in den letzten zwei Wochen (Inzidenz)") + 
+  xlab("Anteil der vollständig geimpften Personen vor zwei Wochen, in Prozent") +
+  geom_point(aes(size = pop, alpha = 0.5)) +
+  scale_size(range = c(1, 15)) +
+  theme_minimal() +
+  geom_smooth(method=lm, se = F, linetype = "dashed", color = "darkblue") +
+  geom_smooth(method=lm, mapping = aes(weight = pop), se = F, linetype = "dashed", color = "darkblue")
+```
+
+Wir können noch weiter gehen und sagen, wir beschränken uns nicht ausschliesslich lineare Funktionen, sondern lassen unser Modell eine flexible Kurve für den Zusammenhang wählen, die auf ihre Art "am besten angepasst" ist (eine sog. LOESS Anpassung). Wir berechnen diese Anpassung ebenfalls mit der Bevölkerungszahl gewichtet.
+
+```{r, echo = FALSE, results = 'asis', message = FALSE, fig.cap = "", fig.align = "center", fig.width = 7, fig.height = 7}
+ggplot(data = combined, mapping = aes(x = second_pct, y = per100k, label=geounit)) +
+  geom_text_repel() +
+  ylab("Fälle pro 100 000 Einwohner in den letzten zwei Wochen (Inzidenz)") + 
+  xlab("Anteil der vollständig geimpften Personen vor zwei Wochen, in Prozent") +
+  geom_point(aes(size = pop, alpha = 0.5)) +
+  scale_size(range = c(1, 15)) +
+  theme_minimal() +
+  geom_smooth(method=lm, se = F, linetype = "dashed", color = "darkblue") +
+  geom_smooth(method=lm, mapping = aes(weight = pop), se = F, linetype = "dashed", color = "darkblue") +
+  geom_smooth(method=loess, se = F, mapping = aes(weight = pop)) 
+```
+
+Hier wird jetzt klar ersichtlich, dass mind. in Gruppe 3 kaum ein Zusammenhang zwischen Impfquote und Inzidenz besteht, der Teil der LOESS Kurve dort ist im wesentlichen horizontal. Dies gilt eigentlich auch für Gruppe 2, aber die Gerade wird dort "zu den bevölkerungsreichen Kantonen heruntergezwungen".
+
+Um das Ganze auf die Spitze zu treiben können wir isoliert in Gruppe 3 ebenfalls noch eine lineare Regression anpassen (für eine sinnvolle LOESS Anpassung hats in Gruppe 3 eher zuwenig Kantone):
+
+```{r, echo = FALSE, results = 'asis', message = FALSE, fig.cap = "", fig.align = "center", fig.width = 7, fig.height = 7}
+ggplot(data = combined, mapping = aes(x = second_pct, y = per100k, label=geounit)) +
+  geom_text_repel() +
+  ylab("Fälle pro 100 000 Einwohner in den letzten zwei Wochen (Inzidenz)") + 
+  xlab("Anteil der vollständig geimpften Personen vor zwei Wochen, in Prozent") +
+  geom_point(aes(size = pop, alpha = 0.5)) +
+  scale_size(range = c(1, 15)) +
+  theme_minimal() +
+  geom_smooth(method=lm, se = F, linetype = "dashed", color = "darkblue") +
+  geom_smooth(method=lm, mapping = aes(weight = pop), se = F, linetype = "dashed", color = "darkblue") +
+  geom_smooth(method=loess, se = F, mapping = aes(weight = pop)) + 
+  geom_smooth(method=lm, se = F, colour="red", mapping = aes(x = second_pct, y = per100k, weight = pop), data = filter(combined, geounit %in% g3)) 
+```
+
+Die Steigung dieser Gerade innerhalb Gruppe 3 ist lediglich `r disp(coef(m3)[2], 1)` mit Korrelationskoeffizient von `r disp(summary(m3)$r.squared, 2)`, d.h. es gibt keinen Zusammenhang mehr zwischen Impfquote und Inzidenz.
+
+# Konklusionen
+
+Aus diesen Analysen schliesse ich:
+
+* Es gibt drei Gruppen von Kantonen, die sich bezüglich Impfquote und Inzidenz unterscheiden.
+* Innerhalb dieser Gruppen erklärt die Impfquote die Inzidenz im wesentlichen nicht.
+* Es müssen andere / weitere Faktoren hinzugezogen werden, die die beobachteten Unterschiede in der Inzidenz besser zu erklären vermögen. Betrachte ich die drei Gruppen scheint mir ein Stadt-Land Zusammenhang nicht unplausibel.
+
+# Abschliessende Kommentare
+
+Generell begrüsse ich das Aufkommen von "Daten-Journalismus" wie das vorliegende Beispiel sehr. Allerdings würde ich mir wünschen, dass Analysen trotz dem Bedürfnis nach genügender Vereinfachung sorgfältig durchgeführt werden.
+
+Zudem bin ich mit folgender Aussage im Artikel nicht einverstanden: 
+
+_Einen kausalen Zusammenhang kann die Statistik nicht belegen._
+
+Randomisierte klinische Versuche in der Medizin (und anderswo, z.B. bei Facebook) sind ein Instrument um Kausalität zu beurteilen. Auch erlebt kausale Inferenz, die Beobachtungsdaten mit (teilweise unverifizierbaren) Annahmen kombiniert um eben genau kausale Aussagen treffen zu können, eine Blütezeit.
