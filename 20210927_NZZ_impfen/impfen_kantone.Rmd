@@ -18,6 +18,8 @@ Ich möchte vorneweg schicken, dass es mir nicht darum geht, den Zusammenhang "I
 
 Aber mich überzeugt die statistische Analyse im unten zitierten Artikel nicht vollständig und ich lege hier meine Sichtweise dar.
 
+Mehr über meine Arbeit als Biostatistiker gibts unter [www.kasparrufibach.ch](http://www.kasparrufibach.ch).
+
 # Zusammenfassung
 
 Am 23. September 2021 erschien [dieser Artikel](https://www.nzz.ch/schweiz/corona-in-der-schweiz-je-mehr-impfungen-desto-weniger-faelle-ld.1646731) in der NZZ und wurde auf [Twitter diskutiert](https://twitter.com/nthelitz/status/1441061065635340290?s=20). Auch der [Tagesanzeiger](https://www.tagesanzeiger.ch) hat dieselben Daten in diesem [Artikel](https://www.tagesanzeiger.ch/dort-wo-viele-geimpft-sind-gibt-es-weniger-ansteckungen-115502688268) analysiert. Der 2. Artikel liegt hinter einer Bezahlschranke, ich habe ihn deswegen nicht lesen können.
