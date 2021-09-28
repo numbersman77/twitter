@@ -55,14 +55,18 @@ library(reporttools)
 
 # define groups
 cant <- select(combined, geounit)[[1]]
-g1 <- c("AI", "GL", "OW")
-g2 <- c("AR", "SG", "UR", "SZ", "TG")
+g1 <- with(combined, geounit[per100k >= 600])
+g2 <- with(combined, geounit[per100k < 600 & per100k >= 450])
 g3 <- cant[(cant %in% c(g1, g2)) == FALSE]
 
+# dummy variable for grouping
+group <- with(combined, cut(per100k, breaks = c(0, 450, 600, Inf), right = FALSE))
+  
 # some models used later
 m1 <- lm(per100k ~ second_pct, data = combined)
 m2 <- lm(per100k ~ second_pct, weights = pop, data = combined)
 m3 <- lm(per100k ~ second_pct, weights = pop, data = filter(combined, geounit %in% g3)) 
+m4 <- lm(per100k ~ second_pct + group, weights = pop, data = combined)
 ```
 
 
@@ -150,6 +154,20 @@ ggplot(data = combined, mapping = aes(x = second_pct, y = per100k, label=geounit
 ```
 
 Die Steigung dieser Gerade innerhalb Gruppe 3 ist lediglich `r disp(coef(m3)[2], 1)` mit Korrelationskoeffizient von `r disp(summary(m3)$r.squared, 2)`, d.h. es gibt keinen Zusammenhang mehr zwischen Impfquote und Inzidenz.
+
+# Multiple Regression
+
+Wir können den Einfluss der Gruppe natürlich auch mit einem multiplen Regressionmodell beurteilen: wir vergleichen das Modell mit und ohne Gruppierungsvariable: 
+
+```{r, include=TRUE, echo=FALSE, results = FALSE, message = FALSE}
+library(stargazer)
+```
+
+```{r message=FALSE, results='asis'} 
+stargazer(m2, m4, type = "html")
+```
+
+Das multiple Regressionmodell bestätigt, dass der Zusammenhang - bei Zunahme von Gruppe - zusammenfällt: Die Steigung beträgt lediglich noch `r disp(coef(m4)[2], 1)`.
 
 # Konklusionen
 
