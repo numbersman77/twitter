@@ -60,7 +60,7 @@ g2 <- with(combined, geounit[per100k < 600 & per100k >= 450])
 g3 <- cant[(cant %in% c(g1, g2)) == FALSE]
 
 # dummy variable for grouping
-group <- with(combined, cut(per100k, breaks = c(0, 450, 600, Inf), right = FALSE))
+group <- factor(with(combined, cut(per100k, breaks = c(0, 450, 600, Inf), right = FALSE)), labels = paste("Gruppe ", 1:3, sep = ""))
   
 # some models used later
 m1 <- lm(per100k ~ second_pct, data = combined)
