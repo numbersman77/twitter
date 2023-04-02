@@ -1,7 +1,7 @@
 ---
 title: "Why do we use group-sequential designs?"
 author: "Kaspar Rufibach"
-date: "Last change: `r format(Sys.time(), '%dth %B %Y')`"
+date: last-modified
 output: 
   rmarkdown::html_document:
     highlight: pygments
@@ -14,7 +14,7 @@ output:
 
 # Purpose of this document
 
-This R markdown file accompanies the [twitter thread](https://twitter.com/numbersman77/status/1326548973411135490?s=20) and provides the code to reproduce all computations. It heavily borrows from code within the [rpact project](http://www.rpact.org). Find the code on [github](https://github.com/numbersman77/twitter.git).
+This R markdown file accompanies this [linkedin article](https://www.linkedin.com/pulse/why-do-we-interim-analyses-clinical-trials-kaspar-rufibach/?trackingId=sHnxC65nS7enuyAXRU5exQ%3D%3D) and provides the code to reproduce all computations. It heavily borrows from code within the [rpact project](http://www.rpact.org). Find the code on [github](https://github.com/numbersman77/twitter.git).
 
 A much more comprehensive description is available in this [rpact vignette](https://vignettes.rpact.org/html/rpact_survival_examples.html#8_Sample_size_calculation_for_trials_with_interim_analyses).
 
@@ -110,7 +110,7 @@ expH0 <- samplesize$expectedEventsH0
 expH1 <- samplesize$expectedEventsH1
 ```
 
-Now the point is that if we stop at an interim we will need less events, because we would stop the trial then. The **expected number of events* can be computed as follows:
+Now the point is that if we stop at an interim we will need less events, because we would stop the trial then. The **expected number of events** can be computed as follows:
 
 * Under $H_0$: `r disp(stopFutIA_H0, 3)` $\cdot$ `r nevents_i1[1]` + `r disp(stopEffIA_H0, 3)` $\cdot$ `r nevents_i1[2]` + `r disp((1 - stopFutIA_H0 - stopEffIA_H0), 3)` $\cdot$ `r nevents_i1[3]` = `r disp(expH0, 0)`.
 * Under $H_1$: `r disp(stopFutIA_H1, 3)` $\cdot$ `r nevents_i1[1]` + `r disp(stopEffIA_H1, 3)` $\cdot$ `r nevents_i1[2]` + `r disp(1 - stopFutIA_H1-stopEffIA_H1, 3)` $\cdot$ `r nevents_i1[3]` = `r disp(expH1, 0)`.
